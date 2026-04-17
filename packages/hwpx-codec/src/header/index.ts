@@ -1,6 +1,7 @@
 import type {
   BeginNum,
   BorderFill,
+  BorderSide,
   Bullet,
   CharPr,
   FontFace,
@@ -501,10 +502,7 @@ export function serializeHeader(h: Header): string {
   return buildDocument(root);
 }
 
-function serializeBorderSide(
-  name: string,
-  side: import('../model/index.js').BorderSide | undefined,
-) {
+function serializeBorderSide(name: string, side: BorderSide | undefined) {
   if (!side) return null;
   return elem(name, {
     type: side.type,

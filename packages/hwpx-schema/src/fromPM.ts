@@ -1,4 +1,12 @@
-import type { CharPr, HwpxDocument, Inline, Paragraph, ParaPr, Run, Section } from '@hwpx/codec';
+import type {
+  CharPr,
+  HwpxDocument,
+  Inline,
+  Paragraph,
+  ParaPr,
+  Run,
+  Section,
+} from '@hwpx/codec';
 import type { Mark as PMMark, Node as PMNode } from 'prosemirror-model';
 
 /**
@@ -164,7 +172,7 @@ function inlineFromNode(node: PMNode, _ctx: ConvertCtx): Inline[] {
       return [{ kind: 'bookmark', name: String(node.attrs['name'] ?? '') }];
     case 'comment': {
       const author = String(node.attrs['author'] ?? '');
-      const next: import('@hwpx/codec').Inline = {
+      const next: Inline = {
         kind: 'comment',
         text: String(node.attrs['text'] ?? ''),
       };
@@ -175,7 +183,7 @@ function inlineFromNode(node: PMNode, _ctx: ConvertCtx): Inline[] {
       const labels = String(node.attrs['labels'] ?? '');
       const widthAttr = node.attrs['width'];
       const heightAttr = node.attrs['height'];
-      const out: import('@hwpx/codec').Inline = {
+      const out: Inline = {
         kind: 'shapeGroup',
         labels,
         raw: {

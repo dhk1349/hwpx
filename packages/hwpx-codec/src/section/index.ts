@@ -85,7 +85,6 @@ function findPagePrInParagraph(node: OrderedNode): PagePr | undefined {
 function parsePagePr(node: OrderedNode): PagePr | undefined {
   // OWPML: <hp:secPr> → <hp:pagePr width=.. height=.. landscape=..> → <hp:margin left=.. ..>
   // 이전 버전은 <hp:pageDef> 를 찾았지만 실제 스펙은 hp:pagePr. 마진도 자식 element 로 분리.
-  let pagePr: OrderedNode | undefined;
   const seekPagePr = (n: OrderedNode): OrderedNode | undefined => {
     for (const c of children(n)) {
       const t = tagName(c);
@@ -100,7 +99,7 @@ function parsePagePr(node: OrderedNode): PagePr | undefined {
     }
     return undefined;
   };
-  pagePr = seekPagePr(node);
+  const pagePr = seekPagePr(node);
   if (!pagePr) return undefined;
   const a = attrs(pagePr);
 

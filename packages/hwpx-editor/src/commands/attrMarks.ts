@@ -1,5 +1,5 @@
 import type { Command, EditorState } from 'prosemirror-state';
-import type { MarkType } from 'prosemirror-model';
+import type { Mark, MarkType } from 'prosemirror-model';
 import { hwpxSchema } from '@hwpx/schema';
 
 type AttrMarkName = 'fontSize' | 'textColor' | 'bgColor' | 'fontFace';
@@ -86,7 +86,7 @@ export function getCurrentFontFace(state: EditorState): { face: string; faceIdx:
 function readAttr<T>(
   state: EditorState,
   name: AttrMarkName,
-  pick: (mark: import('prosemirror-model').Mark) => T | null,
+  pick: (mark: Mark) => T | null,
 ): T | null {
   const type = types[name];
   const { from, to, empty, $from } = state.selection;

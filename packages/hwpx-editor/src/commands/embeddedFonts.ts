@@ -57,10 +57,11 @@ export async function registerEmbeddedFonts(doc: HwpxDocument): Promise<void> {
   // 이전 등록 해제
   for (const [family, url] of registered) {
     const toRemove: FontFace[] = [];
-    (document.fonts as unknown as Iterable<FontFace>) &&
+    if (document.fonts && typeof document.fonts.forEach === 'function') {
       document.fonts.forEach((f) => {
         if (f.family.replace(/^"|"$/g, '') === family) toRemove.push(f);
       });
+    }
     for (const f of toRemove) document.fonts.delete(f);
     URL.revokeObjectURL(url);
   }

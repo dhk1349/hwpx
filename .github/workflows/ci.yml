@@ -59,6 +59,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Workspace packages expose `"main": "./dist/index.js"`; editor tests
+      # import from @hwpx/codec / @hwpx/schema, so we must build libs first.
+      - run: pnpm --filter "./packages/*" build
       - run: pnpm test -- --run
 
   build-web:
