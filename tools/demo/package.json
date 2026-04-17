@@ -1,0 +1,23 @@
+{
+  "name": "@hwpx/demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "hwpx-demo": "./bin/hwpx-demo.ts"
+  },
+  "scripts": {
+    "inspect": "tsx bin/hwpx-demo.ts inspect",
+    "roundtrip": "tsx bin/hwpx-demo.ts roundtrip",
+    "make-sample": "tsx bin/hwpx-demo.ts make-sample"
+  },
+  "dependencies": {
+    "@hwpx/codec": "workspace:*",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1",
+    "@types/node": "^22.7.4",
+    "typescript": "^5.6.2"
+  }
+}

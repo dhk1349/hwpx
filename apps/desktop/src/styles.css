@@ -1,0 +1,501 @@
+:root {
+  color-scheme: light;
+  font-family:
+    'Noto Sans KR',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  line-height: 1.5;
+  --hwpx-border: rgba(60, 65, 80, 0.18);
+  --hwpx-bg: #ffffff;
+  --hwpx-fg: #1c1f26;
+  --hwpx-chrome-bg: #f5f6f9;
+  --hwpx-workspace-bg: #d9dbe2;
+  --hwpx-page-bg: #ffffff;
+  --hwpx-page-border: rgba(60, 65, 80, 0.22);
+  --hwpx-page-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 6px 24px rgba(0, 0, 0, 0.12);
+  --hwpx-accent: #4a6cf7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+.hwpx-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--hwpx-chrome-bg);
+  color: var(--hwpx-fg);
+}
+
+.hwpx-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--hwpx-border);
+  background: var(--hwpx-chrome-bg);
+  user-select: none;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+  row-gap: 0.35rem;
+}
+
+.hwpx-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.25rem;
+  border-right: 1px solid var(--hwpx-border);
+  flex-shrink: 0;
+}
+.hwpx-toolbar-group:last-of-type {
+  border-right: none;
+}
+
+.hwpx-toolbar-btn {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.hwpx-toolbar-btn:hover:not(:disabled) {
+  background: rgba(128, 128, 128, 0.12);
+}
+.hwpx-toolbar-btn:active:not(:disabled) {
+  background: rgba(128, 128, 128, 0.2);
+}
+.hwpx-toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hwpx-toolbar-btn[data-active='true'] {
+  background: rgba(74, 108, 247, 0.15);
+  color: var(--hwpx-accent);
+}
+
+.hwpx-toolbar-flex {
+  flex: 1;
+}
+.hwpx-toolbar-filename {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.hwpx-toolbar-filename[data-dirty='true'] {
+  font-weight: 600;
+  color: var(--hwpx-accent);
+}
+.hwpx-toolbar-platform {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.15);
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.hwpx-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(220, 53, 69, 0.12);
+  color: #b91d36;
+  border-bottom: 1px solid rgba(220, 53, 69, 0.3);
+  font-size: 0.85rem;
+}
+.hwpx-error button {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.hwpx-editor {
+  flex: 1;
+  overflow: auto;
+  padding: 2rem 1.5rem 4rem;
+  background: var(--hwpx-workspace-bg);
+}
+.hwpx-editor .ProseMirror {
+  outline: none;
+  min-height: 100%;
+  /* max-width 를 고정하지 않는다: 섹션별 pagePr 로 width 가 설정된다. */
+  margin: 0 auto;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--hwpx-fg);
+  width: fit-content;
+}
+/* section = 논리 구획 (투명 래퍼). 한 section 안에 여러 page 가 들어감. */
+.hwpx-editor .ProseMirror div[data-hwpx-section] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  margin: 0 auto 32px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.hwpx-editor .ProseMirror div[data-hwpx-section]:last-of-type {
+  margin-bottom: 0;
+}
+
+/* page = 실제 용지 박스. pagePr (width/height/landscape/margins) 이 inline style 로 들어온다. */
+.hwpx-editor .ProseMirror section[data-hwpx-page] {
+  display: block;
+  background: var(--hwpx-page-bg);
+  border: 1px solid var(--hwpx-page-border);
+  border-radius: 2px;
+  box-shadow: var(--hwpx-page-shadow);
+  /* 기본값 (pagePr 미지정 시 A4 근사). inline style 로 덮어씌워짐. */
+  padding: 72px 64px;
+  min-height: 1056px;
+  position: relative;
+  overflow: hidden;
+}
+.hwpx-editor .ProseMirror section[data-hwpx-page]::after {
+  content: attr(data-page-index);
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 0.7rem;
+  color: rgba(60, 65, 80, 0.4);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  z-index: 1;
+}
+.hwpx-editor .ProseMirror section[data-hwpx-page]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  margin: 8px;
+  border: 1px dashed rgba(60, 65, 80, 0.12);
+  pointer-events: none;
+  border-radius: 1px;
+}
+.hwpx-editor .ProseMirror p {
+  margin: 0 0 0.5em 0;
+}
+.hwpx-editor .ProseMirror p[style*='center'] {
+  text-align: center;
+}
+.hwpx-editor .ProseMirror p[style*='right'] {
+  text-align: right;
+}
+.hwpx-editor .ProseMirror p[style*='justify'] {
+  text-align: justify;
+}
+/* page 박스 자체가 시각적 쪽 나눔 역할이므로, 별도 문단 레벨 divider 는 불필요. */
+.hwpx-editor .ProseMirror sup,
+.hwpx-editor .ProseMirror sub {
+  line-height: 0;
+  font-size: 0.78em;
+}
+
+.hwpx-tab {
+  white-space: pre;
+  display: inline-block;
+}
+
+.hwpx-editor .ProseMirror p[data-list-type] {
+  position: relative;
+  padding-left: 1.6rem;
+}
+.hwpx-editor .ProseMirror p[data-list-type='bullet']::before {
+  content: '•';
+  position: absolute;
+  left: 0.4rem;
+  font-weight: 600;
+}
+.hwpx-editor .ProseMirror p[data-list-type='numbered'] {
+  counter-increment: hwpx-list;
+}
+.hwpx-editor .ProseMirror p:not([data-list-type='numbered']) {
+  counter-set: hwpx-list 0;
+}
+.hwpx-editor .ProseMirror p[data-list-type='numbered']::before {
+  content: counter(hwpx-list) '.';
+  position: absolute;
+  left: 0.4rem;
+  font-weight: 600;
+}
+.hwpx-editor .ProseMirror p[data-list-level='1'] { padding-left: 3rem; }
+.hwpx-editor .ProseMirror p[data-list-level='2'] { padding-left: 4.4rem; }
+.hwpx-editor .ProseMirror p[data-list-level='3'] { padding-left: 5.8rem; }
+.hwpx-editor .ProseMirror p[data-list-level='4'] { padding-left: 7.2rem; }
+.hwpx-editor .ProseMirror p[data-list-level='1']::before { left: 1.8rem; }
+.hwpx-editor .ProseMirror p[data-list-level='2']::before { left: 3.2rem; }
+.hwpx-editor .ProseMirror p[data-list-level='3']::before { left: 4.6rem; }
+.hwpx-editor .ProseMirror p[data-list-level='4']::before { left: 6.0rem; }
+.hwpx-footnote,
+.hwpx-endnote {
+  display: inline-block;
+  padding: 0 0.2rem;
+  margin: 0 0.1rem;
+  font-size: 0.7rem;
+  color: #0953c3;
+  background: rgba(9, 83, 195, 0.08);
+  border-radius: 3px;
+  cursor: help;
+  vertical-align: super;
+}
+.hwpx-endnote {
+  color: #7a0ab8;
+  background: rgba(122, 10, 184, 0.08);
+}
+.hwpx-bookmark {
+  display: inline-block;
+  padding: 0 0.2rem;
+  margin: 0 0.05rem;
+  font-size: 0.8rem;
+  color: #b58800;
+  background: rgba(181, 136, 0, 0.12);
+  border-radius: 3px;
+  cursor: help;
+}
+.hwpx-comment {
+  display: inline-block;
+  padding: 0 0.2rem;
+  margin: 0 0.05rem;
+  font-size: 0.8rem;
+  background: rgba(255, 215, 0, 0.18);
+  border-radius: 3px;
+  cursor: help;
+}
+.hwpx-opaque {
+  display: inline-block;
+  padding: 0 0.25rem;
+  border: 1px dashed rgba(128, 128, 128, 0.5);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+.hwpx-table-atom {
+  display: inline-block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
+  vertical-align: top;
+  cursor: pointer;
+  max-width: 100%;
+}
+.hwpx-table-atom.ProseMirror-selectednode {
+  outline: 2px solid var(--hwpx-accent);
+  background: rgba(74, 108, 247, 0.06);
+}
+.hwpx-table-preview {
+  border-collapse: collapse;
+  margin: 0;
+  table-layout: auto;
+}
+.hwpx-table-preview td {
+  border: 1px solid rgba(60, 65, 80, 0.35);
+  padding: 0.25rem 0.45rem;
+  min-width: 1rem;
+  min-height: 1rem;
+  font-size: inherit;
+  line-height: 1.45;
+  vertical-align: top;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.hwpx-table-cell-img {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.15rem 0;
+  vertical-align: top;
+}
+
+.hwpx-shape-group {
+  display: inline-block;
+  padding: 0.35em 0.6em;
+  margin: 0.15em 0.2em;
+  border: 1px dashed rgba(90, 100, 130, 0.55);
+  border-radius: 4px;
+  background: rgba(125, 145, 190, 0.07);
+  color: inherit;
+  font-size: 0.92em;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  vertical-align: middle;
+}
+.hwpx-shape-group::before {
+  content: '◌';
+  margin-right: 0.35em;
+  opacity: 0.6;
+}
+
+.hwpx-toolbar-label {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  padding: 0 0.25rem;
+}
+
+.hwpx-find-match {
+  background: rgba(255, 215, 0, 0.35);
+  border-radius: 2px;
+}
+.hwpx-find-current {
+  background: rgba(255, 140, 0, 0.6);
+  border-radius: 2px;
+}
+
+.hwpx-find-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--hwpx-border);
+  background: rgba(128, 128, 128, 0.05);
+  font-size: 0.85rem;
+}
+.hwpx-find-panel input {
+  flex: 0 1 14rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--hwpx-border);
+  border-radius: 4px;
+  background: var(--hwpx-bg);
+  color: inherit;
+}
+.hwpx-find-panel button {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--hwpx-border);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.hwpx-find-panel button:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+.hwpx-find-count {
+  min-width: 4rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.hwpx-statusbar {
+  display: flex;
+  gap: 1rem;
+  padding: 0.3rem 0.75rem;
+  border-top: 1px solid var(--hwpx-border);
+  font-size: 0.78rem;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.hwpx-toolbar-select {
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--hwpx-border);
+  border-radius: 4px;
+  background: var(--hwpx-bg);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.hwpx-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.hwpx-modal {
+  background: var(--hwpx-bg);
+  color: var(--hwpx-fg);
+  border: 1px solid var(--hwpx-border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  min-width: 28rem;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.hwpx-modal h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+}
+.hwpx-form-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+}
+.hwpx-form-row label {
+  min-width: 5rem;
+}
+.hwpx-form-row input[type='number'] {
+  width: 6rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--hwpx-border);
+  border-radius: 4px;
+  background: var(--hwpx-bg);
+  color: inherit;
+}
+.hwpx-form-row select {
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--hwpx-border);
+  border-radius: 4px;
+  background: var(--hwpx-bg);
+  color: inherit;
+}
+.hwpx-form-fieldset {
+  border: 1px solid var(--hwpx-border);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+}
+.hwpx-form-fieldset legend {
+  padding: 0 0.25rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+.hwpx-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.hwpx-form-actions button {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--hwpx-border);
+  border-radius: 4px;
+  background: var(--hwpx-bg);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.hwpx-form-actions button.hwpx-btn-primary {
+  background: var(--hwpx-accent);
+  color: white;
+  border-color: var(--hwpx-accent);
+}

@@ -1,0 +1,6 @@
+samples/
+expected/
+!samples/.gitkeep
+!expected/.gitkeep
+.venv/
+__pycache__/

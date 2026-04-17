@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/hwpx-codec" },
+    { "path": "./packages/hwpx-schema" },
+    { "path": "./packages/hwpx-editor" },
+    { "path": "./packages/hwpx-platform" },
+    { "path": "./apps/web" },
+    { "path": "./apps/desktop" }
+  ]
+}

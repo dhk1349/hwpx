@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Tauri
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/mobile/src-tauri/target/
+apps/mobile/src-tauri/gen/
+# Tauri/desktop 배포 아티팩트 (커밋 대상 아님)
+apps/desktop/*.zip
+apps/desktop/*.dmg
+apps/desktop/*.app/
+
+# 로컬 임시/테스트용 샘플 (정식 sample 은 apps/web/public/sample.hwpx 유지)
+apps/web/public/tmp/
+
+# Test
+coverage/
+playwright-report/
+test-results/
+.vitest-cache/
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Temp
+*.swp
+*.bak
+.cache/
