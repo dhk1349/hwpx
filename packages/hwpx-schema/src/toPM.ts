@@ -174,9 +174,8 @@ function sectionToNode(section: HwpxSection, doc: HwpxDocument, ctx: ConvertCont
   }
 
   const pageNodes: PMNode[] = pageBuckets.map((bucket, pi) => {
-    const paragraphs = bucket.length > 0
-      ? bucket.map((p) => paragraphToNode(p, doc, ctx))
-      : [emptyParagraph()];
+    const paragraphs =
+      bucket.length > 0 ? bucket.map((p) => paragraphToNode(p, doc, ctx)) : [emptyParagraph()];
     return hwpxSchema.node('page', pageAttrs(pi), paragraphs);
   });
 
@@ -327,13 +326,9 @@ function inlineToNodes(inline: Inline, marks: PMMark[], ctx: ConvertContext): PM
         ),
       ];
     case 'footnote':
-      return [
-        hwpxSchema.nodes['footnote']!.create({ text: inline.text }, undefined, marks),
-      ];
+      return [hwpxSchema.nodes['footnote']!.create({ text: inline.text }, undefined, marks)];
     case 'endnote':
-      return [
-        hwpxSchema.nodes['endnote']!.create({ text: inline.text }, undefined, marks),
-      ];
+      return [hwpxSchema.nodes['endnote']!.create({ text: inline.text }, undefined, marks)];
     case 'comment':
       return [
         hwpxSchema.nodes['comment']!.create(

@@ -1,13 +1,4 @@
-import type {
-  Cell,
-  Inline,
-  PagePr,
-  Paragraph,
-  Row,
-  Run,
-  Section,
-  Table,
-} from '../model/index.js';
+import type { Cell, Inline, PagePr, Paragraph, Row, Run, Section, Table } from '../model/index.js';
 import { HwpxParseError } from '../errors.js';
 import { preserveNode } from '../preservation/index.js';
 import {
@@ -91,8 +82,14 @@ function parsePagePr(node: OrderedNode): PagePr | undefined {
       if (!t) continue;
       if (t === 'hp:pagePr' || t === 'pagePr' || t === 'hp:pageDef' || t === 'pageDef') return c;
       // hp:switch/hp:case/hp:default wrappers (버전 분기) 관통
-      if (t === 'hp:switch' || t === 'switch' || t === 'hp:case' || t === 'case' ||
-          t === 'hp:default' || t === 'default') {
+      if (
+        t === 'hp:switch' ||
+        t === 'switch' ||
+        t === 'hp:case' ||
+        t === 'case' ||
+        t === 'hp:default' ||
+        t === 'default'
+      ) {
         const nested = seekPagePr(c);
         if (nested) return nested;
       }
@@ -108,7 +105,10 @@ function parsePagePr(node: OrderedNode): PagePr | undefined {
   let marginNode: OrderedNode | undefined;
   for (const c of children(pagePr)) {
     const t = tagName(c);
-    if (t === 'hp:margin' || t === 'margin') { marginNode = c; break; }
+    if (t === 'hp:margin' || t === 'margin') {
+      marginNode = c;
+      break;
+    }
   }
   const m = marginNode ? attrs(marginNode) : {};
   const pick = (child: string, legacyAttr: string, fallback: number): number =>
@@ -132,10 +132,7 @@ function parsePagePr(node: OrderedNode): PagePr | undefined {
   };
 }
 
-function findHeaderFooter(
-  sec: OrderedNode,
-  kind: 'header' | 'footer',
-): string | undefined {
+function findHeaderFooter(sec: OrderedNode, kind: 'header' | 'footer'): string | undefined {
   const seek = (node: OrderedNode): string | undefined => {
     for (const child of children(node)) {
       const n = tagName(child);
@@ -225,9 +222,12 @@ function parseInline(node: OrderedNode): Inline | undefined {
   }
   // secPr / colPr 가 ctrl 없이 바로 run 자식으로 나오는 경우 — 마찬가지로 보존 + 숨김.
   if (
-    name === 'hp:secPr' || name === 'secPr' ||
-    name === 'hp:colPr' || name === 'colPr' ||
-    name === 'hp:pageHiding' || name === 'pageHiding'
+    name === 'hp:secPr' ||
+    name === 'secPr' ||
+    name === 'hp:colPr' ||
+    name === 'colPr' ||
+    name === 'hp:pageHiding' ||
+    name === 'pageHiding'
   ) {
     const preserved = preserveNode(node);
     return {
@@ -363,16 +363,26 @@ function extractNoteText(node: OrderedNode): string {
  */
 function isStructuralCtrl(node: OrderedNode): boolean {
   const STRUCTURAL = new Set([
-    'hp:secPr', 'secPr',
-    'hp:colPr', 'colPr',
-    'hp:header', 'header',
-    'hp:footer', 'footer',
-    'hp:pageNum', 'pageNum',
-    'hp:pageHiding', 'pageHiding',
-    'hp:pageNumCtrl', 'pageNumCtrl',
-    'hp:autoNum', 'autoNum',
-    'hp:newNum', 'newNum',
-    'hp:indexMark', 'indexMark',
+    'hp:secPr',
+    'secPr',
+    'hp:colPr',
+    'colPr',
+    'hp:header',
+    'header',
+    'hp:footer',
+    'footer',
+    'hp:pageNum',
+    'pageNum',
+    'hp:pageHiding',
+    'pageHiding',
+    'hp:pageNumCtrl',
+    'pageNumCtrl',
+    'hp:autoNum',
+    'autoNum',
+    'hp:newNum',
+    'newNum',
+    'hp:indexMark',
+    'indexMark',
   ]);
   for (const c of children(node)) {
     const n = tagName(c);
@@ -533,11 +543,7 @@ export function serializeSection(s: Section): string {
   if (s.pagePr || hasHeader || hasFooter) {
     preface.push(serializeSecPr(s));
   }
-  const root = elem(
-    'hs:sec',
-    { 'xmlns:hs': HS_NS, 'xmlns:hp': HP_NS },
-    [...preface, ...body],
-  );
+  const root = elem('hs:sec', { 'xmlns:hs': HS_NS, 'xmlns:hp': HP_NS }, [...preface, ...body]);
   return buildDocument(root);
 }
 
@@ -587,7 +593,6 @@ function buildPlainParagraph(text: string): OrderedNode {
 function serializeText(s: string) {
   return text(s);
 }
-
 
 function serializeParagraph(p: Paragraph): OrderedNode {
   const runs = p.runs.map(serializeRun);
@@ -641,23 +646,15 @@ function serializeInline(inline: Inline): OrderedNode[] {
       return [serializeTable(inline.table)];
     case 'footnote':
       return [
-        elem('hp:footNote', {}, [
-          elem('hp:subList', {}, [buildPlainParagraph(inline.text)]),
-        ]),
+        elem('hp:footNote', {}, [elem('hp:subList', {}, [buildPlainParagraph(inline.text)])]),
       ];
     case 'endnote':
-      return [
-        elem('hp:endNote', {}, [
-          elem('hp:subList', {}, [buildPlainParagraph(inline.text)]),
-        ]),
-      ];
+      return [elem('hp:endNote', {}, [elem('hp:subList', {}, [buildPlainParagraph(inline.text)])])];
     case 'comment':
       return [
-        elem(
-          'hp:memo',
-          inline.author ? { author: inline.author } : {},
-          [elem('hp:subList', {}, [buildPlainParagraph(inline.text)])],
-        ),
+        elem('hp:memo', inline.author ? { author: inline.author } : {}, [
+          elem('hp:subList', {}, [buildPlainParagraph(inline.text)]),
+        ]),
       ];
     case 'shapeGroup':
       // 도형 그룹은 preview 에서 라벨만 뽑고, 저장 시 원본 XML 을 그대로 복원한다.

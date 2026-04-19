@@ -26,15 +26,15 @@ const PAINTER_MARK_NAMES = [
 export type FormatSnapshot = readonly Mark[];
 
 function painterMarkTypes(): MarkType[] {
-  return PAINTER_MARK_NAMES.map((n) => hwpxSchema.marks[n]).filter(
-    (m): m is MarkType => Boolean(m),
+  return PAINTER_MARK_NAMES.map((n) => hwpxSchema.marks[n]).filter((m): m is MarkType =>
+    Boolean(m),
   );
 }
 
 export function captureFormatSnapshot(state: EditorState): FormatSnapshot {
   const { $from, empty } = state.selection;
   const source: readonly Mark[] = empty
-    ? state.storedMarks ?? $from.marks()
+    ? (state.storedMarks ?? $from.marks())
     : (state.doc.nodeAt($from.pos)?.marks ?? $from.marks());
   const wanted = new Set(PAINTER_MARK_NAMES as readonly string[]);
   return source.filter((m) => wanted.has(m.type.name));

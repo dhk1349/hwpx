@@ -216,9 +216,7 @@ export const Editor = forwardRef<EditorController, EditorProps>(function Editor(
   const listenersRef = useRef<Set<() => void>>(new Set());
   // useSyncExternalStore 의 getSnapshot 동일성을 위해 마지막 결과를 캐싱.
   const selectedTableCacheRef = useRef<{ rowCnt: number; colCnt: number } | null>(null);
-  const selectedImageCacheRef = useRef<{ width: number; height: number; alt: string } | null>(
-    null,
-  );
+  const selectedImageCacheRef = useRef<{ width: number; height: number; alt: string } | null>(null);
   const paraPropsCacheRef = useRef<ParagraphPropsSnapshot | null>(null);
 
   useEffect(() => {

@@ -111,7 +111,10 @@ export function findRoot(doc: OrderedNode[], name: string): OrderedNode | undefi
  * 문서 루트에서 네임스페이스 prefix 와 무관하게 로컬 이름으로 첫 요소를 찾는다.
  * 일부 HWPX 파일은 같은 의미인데도 다른 prefix (예: `hv:HCFVersion` vs `ha:HCFVersion`) 를 쓴다.
  */
-export function findRootByLocalName(doc: OrderedNode[], localName: string): OrderedNode | undefined {
+export function findRootByLocalName(
+  doc: OrderedNode[],
+  localName: string,
+): OrderedNode | undefined {
   for (const node of doc) {
     const name = tagName(node);
     if (!name) continue;

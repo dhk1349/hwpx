@@ -12,7 +12,7 @@ export function StylesDialog({ controller, currentStyleIDRef, onClose }: StylesD
   const styles = controller.getAvailableStyles();
   const [selId, setSelId] = useState<string | null>(currentStyleIDRef);
   const initialName = currentStyleIDRef
-    ? styles.find((s) => s.id === currentStyleIDRef)?.name ?? ''
+    ? (styles.find((s) => s.id === currentStyleIDRef)?.name ?? '')
     : '';
   const [renameValue, setRenameValue] = useState<string>(initialName);
   const [newName, setNewName] = useState<string>('');
@@ -23,7 +23,7 @@ export function StylesDialog({ controller, currentStyleIDRef, onClose }: StylesD
     if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
     return a.id.localeCompare(b.id);
   });
-  const selected = selId ? sorted.find((s) => s.id === selId) ?? null : null;
+  const selected = selId ? (sorted.find((s) => s.id === selId) ?? null) : null;
 
   return (
     <div className="hwpx-modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>

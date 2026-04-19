@@ -105,9 +105,12 @@ const sectionSpec: NodeSpec = {
       },
     },
     // 하위 호환: 과거 저장된 DOM 에서 <section> 태그 자체가 section 역할을 했던 경우도 파싱 가능하게
-    { tag: 'section', getAttrs(node: HTMLElement) {
-      return { sectionId: node.getAttribute('data-section-id') ?? '0' };
-    }},
+    {
+      tag: 'section',
+      getAttrs(node: HTMLElement) {
+        return { sectionId: node.getAttribute('data-section-id') ?? '0' };
+      },
+    },
   ],
   toDOM(node) {
     return [
@@ -282,10 +285,7 @@ const tableSpec: NodeSpec = {
     const rows = String(node.attrs['rowCnt']);
     const cols = String(node.attrs['colCnt']);
     const tableWidthHwp = numOrNull(node.attrs['width']) ?? undefined;
-    const tableInner = renderTableSpec(
-      String(node.attrs['cellsJson'] ?? ''),
-      tableWidthHwp,
-    );
+    const tableInner = renderTableSpec(String(node.attrs['cellsJson'] ?? ''), tableWidthHwp);
     return [
       'span',
       {
@@ -593,8 +593,7 @@ function renderCell(cell: PreviewCell): DOMOutputSpec {
     for (const run of para.runs ?? []) {
       // run 별로 style 이 달라지면 직전 text 를 flush 후 current 갱신.
       const nextAttrs = runStyleToAttrs(run.style);
-      const sameStyle =
-        JSON.stringify(nextAttrs) === JSON.stringify(currentStyleAttrs);
+      const sameStyle = JSON.stringify(nextAttrs) === JSON.stringify(currentStyleAttrs);
       if (!sameStyle) {
         flushText();
         currentStyleAttrs = nextAttrs;
@@ -607,8 +606,7 @@ function renderCell(cell: PreviewCell): DOMOutputSpec {
   const tdAttrs: Record<string, string> = {};
   const styleParts: string[] = [];
   if (cell.width && cell.width > 0) styleParts.push(`width:${hwpxUnitToPt(cell.width)}pt`);
-  if (cell.height && cell.height > 0)
-    styleParts.push(`height:${hwpxUnitToPt(cell.height)}pt`);
+  if (cell.height && cell.height > 0) styleParts.push(`height:${hwpxUnitToPt(cell.height)}pt`);
   const ml = cell.marginLeft,
     mr = cell.marginRight,
     mt = cell.marginTop,
@@ -848,8 +846,7 @@ const fontSizeSpec: MarkSpec = {
 
 const textColorSpec: MarkSpec = {
   attrs: { color: { default: '#000000' } },
-  toDOM: (mark) =>
-    ['span', { style: `color:${String(mark.attrs['color'])}` }, 0] as DOMOutputSpec,
+  toDOM: (mark) => ['span', { style: `color:${String(mark.attrs['color'])}` }, 0] as DOMOutputSpec,
 };
 
 const bgColorSpec: MarkSpec = {
@@ -871,13 +868,7 @@ const HANGUL_SANS_FALLBACK = [
   'NanumGothic',
   'sans-serif',
 ];
-const HANGUL_SERIF_FALLBACK = [
-  'Noto Serif KR',
-  'AppleMyungjo',
-  'Batang',
-  'NanumMyeongjo',
-  'serif',
-];
+const HANGUL_SERIF_FALLBACK = ['Noto Serif KR', 'AppleMyungjo', 'Batang', 'NanumMyeongjo', 'serif'];
 const LATIN_SANS_FALLBACK = [
   'system-ui',
   '-apple-system',
@@ -886,21 +877,8 @@ const LATIN_SANS_FALLBACK = [
   'Arial',
   'sans-serif',
 ];
-const LATIN_SERIF_FALLBACK = [
-  'Iowan Old Style',
-  'Palatino',
-  'Georgia',
-  'Times New Roman',
-  'serif',
-];
-const MONO_FALLBACK = [
-  'ui-monospace',
-  'SF Mono',
-  'Menlo',
-  'Consolas',
-  'D2Coding',
-  'monospace',
-];
+const LATIN_SERIF_FALLBACK = ['Iowan Old Style', 'Palatino', 'Georgia', 'Times New Roman', 'serif'];
+const MONO_FALLBACK = ['ui-monospace', 'SF Mono', 'Menlo', 'Consolas', 'D2Coding', 'monospace'];
 
 /**
  * 한컴 오피스 전용 폰트 이름을 가장 가까운 범용/웹폰트로 치환한다.
@@ -908,19 +886,19 @@ const MONO_FALLBACK = [
  * 원본 이름을 지우는 게 아니라 그 뒤에 추가되어 글리프 단위 폴백에 활용됨.
  */
 const FACE_ALIAS: Record<string, string[]> = {
-  '함초롬바탕': ['Noto Serif KR', 'AppleMyungjo', 'Batang', 'serif'],
-  '함초롬돋움': ['Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'sans-serif'],
+  함초롬바탕: ['Noto Serif KR', 'AppleMyungjo', 'Batang', 'serif'],
+  함초롬돋움: ['Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'sans-serif'],
   '맑은 고딕': ['Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', 'sans-serif'],
-  '돋움': ['Dotum', 'Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
-  '바탕': ['Batang', 'AppleMyungjo', 'Noto Serif KR', 'serif'],
-  '굴림': ['Gulim', 'Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
-  '궁서': ['Gungsuh', 'AppleMyungjo', 'Noto Serif KR', 'serif'],
-  'HY헤드라인M': ['Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
-  'HY견고딕': ['Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
-  'HY신명조': ['Noto Serif KR', 'AppleMyungjo', 'serif'],
-  'HY중고딕': ['Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
-  '한양신명조': ['Noto Serif KR', 'AppleMyungjo', 'serif'],
-  '한양헤드라인M': ['Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
+  돋움: ['Dotum', 'Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
+  바탕: ['Batang', 'AppleMyungjo', 'Noto Serif KR', 'serif'],
+  굴림: ['Gulim', 'Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
+  궁서: ['Gungsuh', 'AppleMyungjo', 'Noto Serif KR', 'serif'],
+  HY헤드라인M: ['Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
+  HY견고딕: ['Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
+  HY신명조: ['Noto Serif KR', 'AppleMyungjo', 'serif'],
+  HY중고딕: ['Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
+  한양신명조: ['Noto Serif KR', 'AppleMyungjo', 'serif'],
+  한양헤드라인M: ['Noto Sans KR', 'Apple SD Gothic Neo', 'sans-serif'],
 };
 
 /**
@@ -930,7 +908,8 @@ const FACE_ALIAS: Record<string, string[]> = {
 function classifyFace(face: string): 'serif' | 'sans' | 'mono' {
   const f = face.toLowerCase();
   if (/(mono|consolas|menlo|courier|d2coding)/.test(f)) return 'mono';
-  if (/(명조|바탕|궁서|myungjo|batang|serif|gungsuh|myeongjo|hy신명조|한양신명조)/i.test(face)) return 'serif';
+  if (/(명조|바탕|궁서|myungjo|batang|serif|gungsuh|myeongjo|hy신명조|한양신명조)/i.test(face))
+    return 'serif';
   return 'sans';
 }
 

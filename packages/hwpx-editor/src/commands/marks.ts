@@ -3,13 +3,7 @@ import type { Command, EditorState } from 'prosemirror-state';
 import type { MarkType } from 'prosemirror-model';
 import { hwpxSchema } from '@hwpx/schema';
 
-export type FormatMark =
-  | 'bold'
-  | 'italic'
-  | 'underline'
-  | 'strike'
-  | 'superscript'
-  | 'subscript';
+export type FormatMark = 'bold' | 'italic' | 'underline' | 'strike' | 'superscript' | 'subscript';
 
 const markTypes: Record<FormatMark, MarkType> = {
   bold: hwpxSchema.marks['bold']!,

@@ -127,17 +127,13 @@ export function PageSetupDialog({ initial, onApply, onClose }: PageSetupDialogPr
             <input
               type="number"
               value={pp.marginHeader ?? 0}
-              onChange={(e) =>
-                setPp({ ...pp, marginHeader: Number(e.target.value) || 0 })
-              }
+              onChange={(e) => setPp({ ...pp, marginHeader: Number(e.target.value) || 0 })}
             />
             <label>꼬리말</label>
             <input
               type="number"
               value={pp.marginFooter ?? 0}
-              onChange={(e) =>
-                setPp({ ...pp, marginFooter: Number(e.target.value) || 0 })
-              }
+              onChange={(e) => setPp({ ...pp, marginFooter: Number(e.target.value) || 0 })}
             />
           </div>
         </fieldset>

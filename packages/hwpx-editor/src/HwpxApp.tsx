@@ -170,11 +170,7 @@ export function HwpxApp({
   const italic = useEditorObservable(controller, (c) => c.isMarkActive('italic'), false);
   const underline = useEditorObservable(controller, (c) => c.isMarkActive('underline'), false);
   const strike = useEditorObservable(controller, (c) => c.isMarkActive('strike'), false);
-  const superscript = useEditorObservable(
-    controller,
-    (c) => c.isMarkActive('superscript'),
-    false,
-  );
+  const superscript = useEditorObservable(controller, (c) => c.isMarkActive('superscript'), false);
   const subscript = useEditorObservable(controller, (c) => c.isMarkActive('subscript'), false);
   const activeMarks: Readonly<Record<FormatMark, boolean>> = {
     bold,
@@ -238,15 +234,12 @@ export function HwpxApp({
     (deltaPt: number) => editorRef.current?.adjustParagraphIndent(deltaPt),
     [],
   );
-  const onSetLineSpacing = useCallback(
-    (value: number | null, type: LineSpacingType | null) => {
-      editorRef.current?.setParagraphProps({
-        lineSpacingValue: value,
-        lineSpacingType: type,
-      });
-    },
-    [],
-  );
+  const onSetLineSpacing = useCallback((value: number | null, type: LineSpacingType | null) => {
+    editorRef.current?.setParagraphProps({
+      lineSpacingValue: value,
+      lineSpacingType: type,
+    });
+  }, []);
   const onSetParagraphSpaceBefore = useCallback((value: number | null) => {
     editorRef.current?.setParagraphProps({ marginPrev: value });
   }, []);
@@ -354,7 +347,8 @@ export function HwpxApp({
     const c = editorRef.current;
     const t = c?.getSelectedTable();
     if (!c || !t) return;
-    const coord = globalThis.prompt?.(`셀 좌표 (행,열) — 1~${t.rowCnt}, 1~${t.colCnt}`, '1,1') ?? null;
+    const coord =
+      globalThis.prompt?.(`셀 좌표 (행,열) — 1~${t.rowCnt}, 1~${t.colCnt}`, '1,1') ?? null;
     if (!coord) return;
     const m = /^(\d+)\s*,\s*(\d+)$/.exec(coord.trim());
     if (!m) return;
@@ -451,9 +445,7 @@ export function HwpxApp({
       ) : null}
       {showHeaderFooter ? (
         <HeaderFooterDialog
-          initial={
-            editorRef.current?.getHeaderFooter() ?? { headerText: '', footerText: '' }
-          }
+          initial={editorRef.current?.getHeaderFooter() ?? { headerText: '', footerText: '' }}
           onApply={(next) => editorRef.current?.setHeaderFooter(next)}
           onClose={() => setShowHeaderFooter(false)}
         />

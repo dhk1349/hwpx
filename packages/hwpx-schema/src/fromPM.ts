@@ -1,12 +1,4 @@
-import type {
-  CharPr,
-  HwpxDocument,
-  Inline,
-  Paragraph,
-  ParaPr,
-  Run,
-  Section,
-} from '@hwpx/codec';
+import type { CharPr, HwpxDocument, Inline, Paragraph, ParaPr, Run, Section } from '@hwpx/codec';
 import type { Mark as PMMark, Node as PMNode } from 'prosemirror-model';
 
 /**

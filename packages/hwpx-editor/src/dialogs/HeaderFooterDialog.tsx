@@ -46,7 +46,8 @@ export function HeaderFooterDialog({ initial, onApply, onClose }: HeaderFooterDi
         </div>
 
         <p className="hwpx-form-help">
-          * 현재 버전은 단일 문단 평문만 저장합니다. 서식이 포함된 머리/꼬리말은 열릴 때 평문으로 변환됩니다.
+          * 현재 버전은 단일 문단 평문만 저장합니다. 서식이 포함된 머리/꼬리말은 열릴 때 평문으로
+          변환됩니다.
         </p>
 
         <div className="hwpx-form-actions">

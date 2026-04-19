@@ -194,7 +194,10 @@ export function mergeCells(r1: number, c1: number, r2: number, c2: number): Comm
                     styleIDRef: '0',
                     runs: [
                       ...(cell.body[0]?.runs ?? []),
-                      { charPrIDRef: '0', inlines: texts.map((value) => ({ kind: 'text', value })) },
+                      {
+                        charPrIDRef: '0',
+                        inlines: texts.map((value) => ({ kind: 'text', value })),
+                      },
                     ],
                   },
                 ]

@@ -240,27 +240,18 @@ function parseParaProperties(refList: ReturnType<typeof findRoot>): Map<string, 
     const alignRaw = alignNode ? attrs(alignNode)['horizontal'] : undefined;
     const marginNode = findDescendant(pp, 'hh:margin', 'margin');
     const indentFirstLine = marginNode
-      ? readSubValue(marginNode, 'hc:intent', 'intent') ?? readSubValue(marginNode, 'hc:indent', 'indent')
+      ? (readSubValue(marginNode, 'hc:intent', 'intent') ??
+        readSubValue(marginNode, 'hc:indent', 'indent'))
       : undefined;
-    const indentLeft = marginNode
-      ? readSubValue(marginNode, 'hc:left', 'left')
-      : undefined;
-    const indentRight = marginNode
-      ? readSubValue(marginNode, 'hc:right', 'right')
-      : undefined;
-    const marginPrev = marginNode
-      ? readSubValue(marginNode, 'hc:prev', 'prev')
-      : undefined;
-    const marginNext = marginNode
-      ? readSubValue(marginNode, 'hc:next', 'next')
-      : undefined;
+    const indentLeft = marginNode ? readSubValue(marginNode, 'hc:left', 'left') : undefined;
+    const indentRight = marginNode ? readSubValue(marginNode, 'hc:right', 'right') : undefined;
+    const marginPrev = marginNode ? readSubValue(marginNode, 'hc:prev', 'prev') : undefined;
+    const marginNext = marginNode ? readSubValue(marginNode, 'hc:next', 'next') : undefined;
     const lineSpacingNode = findDescendant(pp, 'hh:lineSpacing', 'lineSpacing');
     const lineSpacingType = lineSpacingNode
       ? normalizeLineSpacing(attrs(lineSpacingNode)['type'])
       : undefined;
-    const lineSpacingValue = lineSpacingNode
-      ? toNum(attrs(lineSpacingNode)['value'])
-      : undefined;
+    const lineSpacingValue = lineSpacingNode ? toNum(attrs(lineSpacingNode)['value']) : undefined;
     // listType/listLevel 은 아직 공식 샘플에서 확인 필요 — 기존처럼 속성으로도 시도.
     out.set(id, {
       id,
@@ -281,7 +272,13 @@ function parseParaProperties(refList: ReturnType<typeof findRoot>): Map<string, 
 
 /**
  * paraPr 자식 중 name 을 찾되, <hp:switch>/<hp:case>/<hp:default> 래퍼를 투과한다.
- * 첫 일치 노드를 반환.
+ *
+ * OWPML 의 `<hp:switch>` 는 feature-detection pattern — `<hp:case
+ * required-namespace="…HwpUnitChar">` 가 "reader 가 이 네임스페이스를 지원하면
+ * 이 블록을 쓰라", `<hp:default>` 가 그 외. 같은 paraPr 안에 두 hh:margin 이
+ * 들어있고 값이 서로 다른 경우 (예: case=-1300, default=-2600) 모던 reader 는
+ * case 를 써야 한다. 과거 구현은 DFS 스택 LIFO 때문에 default 를 먼저 읽어
+ * 모든 들여쓰기가 2× 로 커졌다. 이를 고치기 위해 BFS + `hp:case` 우선순위.
  */
 function findDescendant(
   root: ReturnType<typeof findRoot>,
@@ -289,16 +286,47 @@ function findDescendant(
   bareName: string,
 ): ReturnType<typeof findRoot> {
   if (!root) return undefined;
-  const stack: Array<typeof root> = [root];
-  while (stack.length) {
-    const cur = stack.pop();
-    if (!cur) continue;
-    for (const c of children(cur)) {
-      const t = tagName(c);
-      if (t === nsName || t === bareName) return c;
-      if (t === 'hp:switch' || t === 'switch' || t === 'hp:case' || t === 'case' || t === 'hp:default' || t === 'default') {
-        stack.push(c);
+  // 1 차: case 우선으로 탐색 (switch 를 만나면 case children 먼저).
+  const fromCase = seek(root, nsName, bareName, 'case');
+  if (fromCase) return fromCase;
+  // 2 차: default 허용.
+  return seek(root, nsName, bareName, 'default');
+}
+
+type OwpmlNode = ReturnType<typeof findRoot>;
+
+function seek(
+  node: OwpmlNode,
+  nsName: string,
+  bareName: string,
+  prefer: 'case' | 'default',
+): OwpmlNode {
+  if (!node) return undefined;
+  for (const c of children(node)) {
+    const t = tagName(c);
+    if (t === nsName || t === bareName) return c;
+    if (t === 'hp:switch' || t === 'switch') {
+      // switch 는 case/default 순서로 children 을 가짐. 우리가 원하는 분기만 먼저 탐색.
+      const primary = prefer === 'case' ? ['hp:case', 'case'] : ['hp:default', 'default'];
+      const secondary = prefer === 'case' ? ['hp:default', 'default'] : ['hp:case', 'case'];
+      for (const sc of children(c)) {
+        const st = tagName(sc) ?? '';
+        if (!primary.includes(st)) continue;
+        const found = seek(sc, nsName, bareName, prefer);
+        if (found) return found;
       }
+      // 지정된 분기에 없으면 반대 분기에도 시도하지 않는다 (다른 fallback 경로가 처리).
+      // 단 단일 case 만 있는 경우엔 secondary 빈 분기. 안전하게 이어 본다.
+      for (const sc of children(c)) {
+        const st = tagName(sc) ?? '';
+        if (!secondary.includes(st)) continue;
+        const found = seek(sc, nsName, bareName, prefer);
+        if (found) return found;
+      }
+    } else if (t === 'hp:case' || t === 'case' || t === 'hp:default' || t === 'default') {
+      // 직계 case/default 도 그냥 내부로 내려간다 (상위 switch 호출에서 이미 필터됨).
+      const found = seek(c, nsName, bareName, prefer);
+      if (found) return found;
     }
   }
   return undefined;
@@ -594,8 +622,7 @@ function serializeParaPr(pp: ParaPr) {
     indentLeft: pp.indentLeft !== undefined ? String(pp.indentLeft) : undefined,
     indentRight: pp.indentRight !== undefined ? String(pp.indentRight) : undefined,
     indentFirstLine: pp.indentFirstLine !== undefined ? String(pp.indentFirstLine) : undefined,
-    lineSpacingValue:
-      pp.lineSpacingValue !== undefined ? String(pp.lineSpacingValue) : undefined,
+    lineSpacingValue: pp.lineSpacingValue !== undefined ? String(pp.lineSpacingValue) : undefined,
     lineSpacingType: pp.lineSpacingType,
     marginPrev: pp.marginPrev !== undefined ? String(pp.marginPrev) : undefined,
     marginNext: pp.marginNext !== undefined ? String(pp.marginNext) : undefined,

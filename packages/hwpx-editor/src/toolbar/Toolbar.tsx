@@ -2,10 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Style } from '@hwpx/codec';
 import type { Align } from '../commands/align.js';
 import type { FormatMark } from '../commands/marks.js';
-import type {
-  LineSpacingType,
-  ParagraphPropsSnapshot,
-} from '../commands/paragraphProps.js';
+import type { LineSpacingType, ParagraphPropsSnapshot } from '../commands/paragraphProps.js';
 import type { ListType } from '../commands/lists.js';
 
 export interface ToolbarProps {
@@ -206,7 +203,10 @@ export function Toolbar(props: ToolbarProps) {
         >
           ⇤⟍
         </ToolbarButton>
-        <ToolbarButton onClick={() => props.onAdjustIndent(10)} title="들여쓰기 (왼쪽 들여쓰기 증가)">
+        <ToolbarButton
+          onClick={() => props.onAdjustIndent(10)}
+          title="들여쓰기 (왼쪽 들여쓰기 증가)"
+        >
           ⟌⇥
         </ToolbarButton>
         <select
@@ -236,8 +236,7 @@ export function Toolbar(props: ToolbarProps) {
         <ToolbarButton
           onClick={() => {
             const current = props.currentParaProps.marginPrev ?? 0;
-            const before =
-              globalThis.prompt?.('문단 위 여백(pt)', String(current / 100)) ?? null;
+            const before = globalThis.prompt?.('문단 위 여백(pt)', String(current / 100)) ?? null;
             if (before === null) return;
             const n = Number(before.trim());
             if (!Number.isFinite(n) || n < 0) return;
@@ -250,8 +249,7 @@ export function Toolbar(props: ToolbarProps) {
         <ToolbarButton
           onClick={() => {
             const current = props.currentParaProps.marginNext ?? 0;
-            const after =
-              globalThis.prompt?.('문단 아래 여백(pt)', String(current / 100)) ?? null;
+            const after = globalThis.prompt?.('문단 아래 여백(pt)', String(current / 100)) ?? null;
             if (after === null) return;
             const n = Number(after.trim());
             if (!Number.isFinite(n) || n < 0) return;
