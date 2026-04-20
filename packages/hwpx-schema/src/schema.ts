@@ -44,11 +44,18 @@ const paragraphSpec: NodeSpec = {
     const a = node.attrs;
     const parts: string[] = [];
     if (a['align']) parts.push(`text-align:${a['align']}`);
-    const indentLeft = numOrNull(a['indentLeft']);
+    let indentLeft = numOrNull(a['indentLeft']);
+    const firstLine = numOrNull(a['indentFirstLine']);
+    // 음수 첫 줄 들여쓰기(글머리표 hanging indent) 가 좌측 padding 부족으로
+    // 박스 밖에서 잘리지 않도록 padding-left 를 |firstLine| 까지 끌어올린다.
+    // PM 노드 attr 는 원본 값을 유지 (round-trip 안전), CSS 출력만 보정.
+    if (firstLine !== null && firstLine < 0) {
+      const need = -firstLine;
+      if ((indentLeft ?? 0) < need) indentLeft = need;
+    }
     if (indentLeft !== null) parts.push(`padding-left:${hwpxUnitToPt(indentLeft)}pt`);
     const indentRight = numOrNull(a['indentRight']);
     if (indentRight !== null) parts.push(`padding-right:${hwpxUnitToPt(indentRight)}pt`);
-    const firstLine = numOrNull(a['indentFirstLine']);
     if (firstLine !== null) parts.push(`text-indent:${hwpxUnitToPt(firstLine)}pt`);
     const lsValue = numOrNull(a['lineSpacingValue']);
     const lsType = a['lineSpacingType'] as string | null;

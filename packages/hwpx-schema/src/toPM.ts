@@ -141,6 +141,37 @@ function resolveRunStyle(charPrIDRef: string, ctx: ConvertContext): PreviewRunSt
 }
 
 /**
+ * 음수 첫 줄 들여쓰기(hanging indent) 를 클리핑 없이 표시하기 위해 left padding 을 보정.
+ *
+ * HWP/HWPX 본문은 종종 `<hc:intent value="-4172"/><hc:left value="0"/>` 같이
+ * 음수 첫 줄 들여쓰기 + 좌측 padding 0 인 글머리표 단락을 사용한다. CSS 의
+ * `text-indent: -41.72pt; padding-left: 0` 는 첫 글자(=글머리표) 를 박스 밖으로
+ * 밀어내 잘리게 만든다. 보존된 indent 가 음수이고 indentLeft 가 부족할 때
+ * indentLeft 를 |intent| 만큼 늘려 표준 hanging-indent CSS 패턴
+ * (`padding-left: X; text-indent: -X`) 으로 만들어준다.
+ *
+ * 양수 첫 줄 들여쓰기나 이미 충분한 indentLeft 가 있을 때는 원본 값 그대로 둔다.
+ */
+function effectiveIndents(pp: ParaPr | undefined): {
+  indentLeft?: number;
+  indentFirstLine?: number;
+  indentRight?: number;
+} {
+  if (!pp) return {};
+  const il = pp.indentLeft;
+  const ifl = pp.indentFirstLine;
+  const ir = pp.indentRight;
+  if (ifl !== undefined && ifl < 0) {
+    const need = -ifl;
+    const have = il ?? 0;
+    if (have < need) {
+      return { indentLeft: need, indentFirstLine: ifl, indentRight: ir };
+    }
+  }
+  return { indentLeft: il, indentFirstLine: ifl, indentRight: ir };
+}
+
+/**
  * paraPrIDRef → PreviewParaStyle. 표 셀 안 단락에 적용할 정렬/줄간격/들여쓰기.
  * paraPr 가 없거나 의미있는 값이 없으면 undefined.
  */
@@ -171,14 +202,15 @@ function resolveParaStyle(paraPrIDRef: string, ctx: ConvertContext): PreviewPara
       out.lineHeight = `${pp.lineSpacingValue / 100}pt`;
     }
   }
-  if (pp.indentFirstLine !== undefined && pp.indentFirstLine !== null) {
-    out.textIndent = pp.indentFirstLine;
+  const eff = effectiveIndents(pp);
+  if (eff.indentFirstLine !== undefined) {
+    out.textIndent = eff.indentFirstLine;
   }
-  if (pp.indentLeft !== undefined && pp.indentLeft !== null) {
-    out.paddingLeft = pp.indentLeft;
+  if (eff.indentLeft !== undefined) {
+    out.paddingLeft = eff.indentLeft;
   }
-  if (pp.indentRight !== undefined && pp.indentRight !== null) {
-    out.paddingRight = pp.indentRight;
+  if (eff.indentRight !== undefined) {
+    out.paddingRight = eff.indentRight;
   }
   if (pp.marginPrev !== undefined && pp.marginPrev !== null) {
     out.marginTop = pp.marginPrev;
@@ -256,6 +288,9 @@ function paragraphToNode(p: HwpxParagraph, doc: HwpxDocument, ctx: ConvertContex
   for (const run of p.runs) {
     inlines.push(...runToNodes(run, doc, ctx));
   }
+  // 주의: indentLeft/indentFirstLine 은 원본 값을 그대로 보존한다.
+  // 음수 첫 줄 들여쓰기 → 클리핑 보정은 render 시점 (schema.paragraphSpec.toDOM) 에서만
+  // 적용해야 fromPM 라운드트립 시 원본 paraPr 값이 변형되지 않는다.
   return hwpxSchema.node(
     'paragraph',
     {
