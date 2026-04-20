@@ -175,8 +175,9 @@ body,
   /* width 는 inline style 로 pagePr 에서 들어옴. 없을 때만 A4 근사. */
 }
 .hwpx-editor .ProseMirror section[data-hwpx-page]::after {
-  /* 섹션 id + 페이지 index 를 페이지 우상단에 조용히 표시. */
-  content: attr(data-page-index);
+  /* 문서 전체 기준 "현재 페이지 / 전체 페이지" 를 우상단에 조용히 표시.
+     toPM 두 단계 패스에서 globalPageIndex/totalPages 를 계산해 data-page-label 에 주입한다. */
+  content: attr(data-page-label);
   position: absolute;
   top: 8px;
   right: 12px;

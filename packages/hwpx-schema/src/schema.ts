@@ -137,6 +137,10 @@ const pageSpec: NodeSpec = {
   group: 'block',
   attrs: {
     pageIndex: { default: 0 },
+    /** 문서 전체에서 0-based 페이지 인덱스. 페이지 우상단 표시에 사용. */
+    globalPageIndex: { default: 0 },
+    /** 문서 전체 페이지 수. 0 이면 미지정 (구버전 데이터 호환). */
+    totalPages: { default: 0 },
     // HWPUNIT = 1/100 pt. 0 = 미지정.
     pageWidth: { default: 0 },
     pageHeight: { default: 0 },
@@ -152,6 +156,8 @@ const pageSpec: NodeSpec = {
       getAttrs(node: HTMLElement) {
         return {
           pageIndex: Number(node.getAttribute('data-page-index')) || 0,
+          globalPageIndex: Number(node.getAttribute('data-global-page-index')) || 0,
+          totalPages: Number(node.getAttribute('data-total-pages')) || 0,
           pageWidth: Number(node.getAttribute('data-page-width')) || 0,
           pageHeight: Number(node.getAttribute('data-page-height')) || 0,
           pageLandscape: node.getAttribute('data-page-landscape') === 'true',
@@ -188,10 +194,16 @@ const pageSpec: NodeSpec = {
       const mbPt = hwpxUnitToPt(mb);
       styleParts.push(`padding:${mtPt}pt ${mrPt}pt ${mbPt}pt ${mlPt}pt`);
     }
+    const gpi = Number(a['globalPageIndex']) || 0;
+    const total = Number(a['totalPages']) || 0;
     const domAttrs: Record<string, string> = {
       'data-hwpx-page': 'true',
       'data-page-index': String(a['pageIndex']),
+      'data-global-page-index': String(gpi),
+      // CSS ::after 가 attr() 로 읽어 우상단에 "X / Y" 표시. total 미지정이면 X 만.
+      'data-page-label': total > 0 ? `${gpi + 1} / ${total}` : `${gpi + 1}`,
     };
+    if (total > 0) domAttrs['data-total-pages'] = String(total);
     if (pageW > 0) domAttrs['data-page-width'] = String(pageW);
     if (pageH > 0) domAttrs['data-page-height'] = String(pageH);
     if (landscape) domAttrs['data-page-landscape'] = 'true';

@@ -63,10 +63,19 @@ export function toProseMirror(doc: HwpxDocument, opts: ToProseMirrorOptions = {}
     paraProps: doc.header.paraProps,
     fontFaces: doc.header.fontFaces,
   };
-  const sections =
-    doc.sections.length > 0
-      ? doc.sections.map((s) => sectionToNode(s, doc, ctx))
-      : [emptySection()];
+  if (doc.sections.length === 0) {
+    return hwpxSchema.node('doc', null, [emptySection()]);
+  }
+  // 1차 패스: 각 섹션이 만들어낼 페이지 수를 계산해 totalPages 를 구한다.
+  // 2차 패스: 누적 globalPageIndex 와 함께 실제 노드를 만든다.
+  const sectionPageCounts = doc.sections.map((s) => countSectionPages(s, ctx));
+  const totalPages = sectionPageCounts.reduce((a, b) => a + b, 0);
+  const sections: PMNode[] = [];
+  let runningStart = 0;
+  for (let i = 0; i < doc.sections.length; i += 1) {
+    sections.push(sectionToNode(doc.sections[i]!, doc, ctx, runningStart, totalPages));
+    runningStart += sectionPageCounts[i] ?? 0;
+  }
   return hwpxSchema.node('doc', null, sections);
 }
 
@@ -237,43 +246,22 @@ function resolveBorderDecor(
   return out;
 }
 
-function sectionToNode(section: HwpxSection, doc: HwpxDocument, ctx: ConvertContext): PMNode {
-  // HWPX 섹션 안의 paragraph 들을 pageBreak="1" 경계로 1차 분할 후, 각 버킷이
-  // 페이지 본문 영역 (pageHeight − marginTop − marginBottom) 을 넘지 않도록
-  // 본문 줄 수를 추정해 추가 분할한다. 추정은 보수적인 근사값이며 — 정확한
-  // 페이지 분할은 브라우저 레이아웃에 의존하지만, 이 사전 분할만으로도 1410개
-  // 단락이 1개 페이지에 쌓이는 비정상 상황은 막을 수 있다.
-  //
-  // 주의: 합성된 페이지 경계는 round-trip 시 pageBreak 마커로 저장되면 안 된다.
-  // fromPM 은 page 경계가 아니라 paragraph.attrs.pageBreak 만 신뢰해야 한다.
-  const pp = section.pagePr;
-  const pageAttrs = (index: number): Record<string, unknown> => {
-    const out: Record<string, unknown> = { pageIndex: index };
-    if (pp) {
-      out['pageWidth'] = pp.width ?? 0;
-      out['pageHeight'] = pp.height ?? 0;
-      out['pageLandscape'] = !!pp.landscape;
-      out['marginLeft'] = pp.marginLeft ?? 0;
-      out['marginRight'] = pp.marginRight ?? 0;
-      out['marginTop'] = pp.marginTop ?? 0;
-      out['marginBottom'] = pp.marginBottom ?? 0;
-    }
-    return out;
-  };
-
+/**
+ * 섹션 본문을 명시적 pageBreak + 추정 높이로 분할한 페이지 버킷 배열을 반환.
+ * sectionToNode 의 페이지 분할 로직과 countSectionPages 가 공유한다.
+ */
+function bucketSectionPages(section: HwpxSection, ctx: ConvertContext): HwpxParagraph[][] {
   const bodyParas = section.body.length > 0 ? section.body : [];
   const explicitBuckets: HwpxParagraph[][] = [[]];
   for (let i = 0; i < bodyParas.length; i += 1) {
     const p = bodyParas[i]!;
-    // 첫 paragraph 의 pageBreak 는 "섹션 시작도 곧 페이지 시작" 이라는 의미로 무시.
     if (p.pageBreak && i > 0) {
       explicitBuckets.push([p]);
     } else {
       explicitBuckets[explicitBuckets.length - 1]!.push(p);
     }
   }
-
-  // 본문 영역 (pt). 미정 시 A4 기준 fallback.
+  const pp = section.pagePr;
   const A4_WIDTH_HWP = 59528;
   const A4_HEIGHT_HWP = 84189;
   const widthHwp = pp?.landscape ? (pp.height ?? A4_HEIGHT_HWP) : (pp?.width ?? A4_WIDTH_HWP);
@@ -287,10 +275,10 @@ function sectionToNode(section: HwpxSection, doc: HwpxDocument, ctx: ConvertCont
     (heightHwp - (pp?.marginTop ?? 0) - (pp?.marginBottom ?? 0)) / 100,
   );
 
-  const pageBuckets: HwpxParagraph[][] = [];
+  const out: HwpxParagraph[][] = [];
   for (const bucket of explicitBuckets) {
     if (bucket.length === 0) {
-      pageBuckets.push(bucket);
+      out.push(bucket);
       continue;
     }
     let curr: HwpxParagraph[] = [];
@@ -298,17 +286,55 @@ function sectionToNode(section: HwpxSection, doc: HwpxDocument, ctx: ConvertCont
     for (const para of bucket) {
       const ph = estimateParaHeightPt(para, ctx, contentWidthPt);
       if (curr.length > 0 && currHeight + ph > contentHeightPt) {
-        pageBuckets.push(curr);
+        out.push(curr);
         curr = [];
         currHeight = 0;
       }
       curr.push(para);
       currHeight += ph;
     }
-    pageBuckets.push(curr);
+    out.push(curr);
   }
-  if (pageBuckets.length === 0) pageBuckets.push([]);
+  if (out.length === 0) out.push([]);
+  return out;
+}
 
+function countSectionPages(section: HwpxSection, ctx: ConvertContext): number {
+  return bucketSectionPages(section, ctx).length;
+}
+
+function sectionToNode(
+  section: HwpxSection,
+  doc: HwpxDocument,
+  ctx: ConvertContext,
+  globalPageStart: number,
+  totalPages: number,
+): PMNode {
+  // 명시 pageBreak + 본문 높이 추정으로 분할된 페이지 버킷을 가져온다.
+  // bucketSectionPages 는 countSectionPages 와 공유되므로 1차/2차 패스 결과가 일치.
+  //
+  // 주의: 합성된 페이지 경계는 round-trip 시 pageBreak 마커로 저장되면 안 된다.
+  // fromPM 은 page 경계가 아니라 paragraph.attrs.pageBreak 만 신뢰해야 한다.
+  const pp = section.pagePr;
+  const pageAttrs = (localIndex: number): Record<string, unknown> => {
+    const out: Record<string, unknown> = {
+      pageIndex: localIndex,
+      globalPageIndex: globalPageStart + localIndex,
+      totalPages,
+    };
+    if (pp) {
+      out['pageWidth'] = pp.width ?? 0;
+      out['pageHeight'] = pp.height ?? 0;
+      out['pageLandscape'] = !!pp.landscape;
+      out['marginLeft'] = pp.marginLeft ?? 0;
+      out['marginRight'] = pp.marginRight ?? 0;
+      out['marginTop'] = pp.marginTop ?? 0;
+      out['marginBottom'] = pp.marginBottom ?? 0;
+    }
+    return out;
+  };
+
+  const pageBuckets = bucketSectionPages(section, ctx);
   const pageNodes: PMNode[] = pageBuckets.map((bucket, pi) => {
     const paragraphs =
       bucket.length > 0 ? bucket.map((p) => paragraphToNode(p, doc, ctx)) : [emptyParagraph()];
