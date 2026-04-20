@@ -102,4 +102,47 @@ describe('hwpx-schema toPM/fromPM', () => {
     const ids = back.sections[0]!.body[0]!.runs.map((r) => r.charPrIDRef);
     expect(ids).toEqual(['0', '1', '0']);
   });
+
+  it('assigns continuous globalPageIndex + totalPages across multiple sections', () => {
+    // 두 섹션 → 각 섹션 1 페이지 → 총 2 페이지.
+    // 섹션 2 의 첫 페이지는 local pageIndex=0 이지만 globalPageIndex=1 이어야 한다.
+    const multiSection: HwpxDocument = {
+      ...baseDoc,
+      sections: [
+        {
+          id: 'section0',
+          body: [
+            {
+              id: '0',
+              paraPrIDRef: '0',
+              runs: [{ charPrIDRef: '0', inlines: [{ kind: 'text', value: 'first section' }] }],
+            },
+          ],
+        },
+        {
+          id: 'section1',
+          body: [
+            {
+              id: '1',
+              paraPrIDRef: '0',
+              runs: [{ charPrIDRef: '0', inlines: [{ kind: 'text', value: 'second section' }] }],
+            },
+          ],
+        },
+      ],
+    };
+    const pm = toProseMirror(multiSection);
+    expect(pm.childCount).toBe(2);
+    const sec0Page0 = pm.child(0).child(0);
+    const sec1Page0 = pm.child(1).child(0);
+    // Local index resets per section.
+    expect(sec0Page0.attrs['pageIndex']).toBe(0);
+    expect(sec1Page0.attrs['pageIndex']).toBe(0);
+    // Global index continues across sections.
+    expect(sec0Page0.attrs['globalPageIndex']).toBe(0);
+    expect(sec1Page0.attrs['globalPageIndex']).toBe(1);
+    // totalPages is the same on every page.
+    expect(sec0Page0.attrs['totalPages']).toBe(2);
+    expect(sec1Page0.attrs['totalPages']).toBe(2);
+  });
 });
