@@ -18,23 +18,18 @@ export function fromProseMirror(pm: PMNode, previous: HwpxDocument): HwpxDocumen
     const id = String(sectionNode.attrs['sectionId'] ?? `section${index}`);
     const body: Paragraph[] = [];
     // New layout: section > page+ > paragraph+. Flatten pages back into a
-    // single paragraph stream, marking the first paragraph of each non-first
-    // page as a page break so the XML round-trip preserves the boundary.
+    // single paragraph stream. pageBreak 경계는 paragraph.attrs.pageBreak
+    // 자체에만 의존한다 — toPM 에서 만든 synthetic 페이지 경계 (본문 길이로
+    // 분할된 것) 는 원본 파일에 없던 pageBreak 마커를 만들어내면 안 되기 때문.
+    // 명시적 page break 는 paragraphToNode 가 paragraph.attrs['pageBreak'] 으로
+    // 이미 전달했으므로 round-trip 이 유지된다.
     let paraCounter = 0;
-    let pageIdx = 0;
     sectionNode.forEach((pageNode) => {
       if (pageNode.type.name === 'page') {
-        let firstParaInPage = true;
         pageNode.forEach((paraNode) => {
           if (paraNode.type.name !== 'paragraph') return;
-          const para = paragraphFromNode(paraNode, paraCounter++, ctx);
-          if (firstParaInPage && pageIdx > 0) {
-            para.pageBreak = true;
-          }
-          firstParaInPage = false;
-          body.push(para);
+          body.push(paragraphFromNode(paraNode, paraCounter++, ctx));
         });
-        pageIdx += 1;
       } else if (pageNode.type.name === 'paragraph') {
         // Back-compat: allow flat section > paragraph+ as before.
         body.push(paragraphFromNode(pageNode, paraCounter++, ctx));

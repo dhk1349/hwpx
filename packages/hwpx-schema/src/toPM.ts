@@ -238,10 +238,14 @@ function resolveBorderDecor(
 }
 
 function sectionToNode(section: HwpxSection, doc: HwpxDocument, ctx: ConvertContext): PMNode {
-  // HWPX 섹션 안의 paragraph 들을 pageBreak="1" 경계로 묶어 page 노드로 쪼갠다.
-  // 첫 paragraph 는 자동으로 첫 페이지의 시작이고, 이후 pageBreak=true paragraph 는
-  // 새 페이지의 첫 paragraph 가 된다. 내용 길이에 따른 자동 페이지 분할은 run-time
-  // 레이아웃 이슈 (CSS 로 처리) 라 이 단계에서는 명시적 pageBreak 만 존중한다.
+  // HWPX 섹션 안의 paragraph 들을 pageBreak="1" 경계로 1차 분할 후, 각 버킷이
+  // 페이지 본문 영역 (pageHeight − marginTop − marginBottom) 을 넘지 않도록
+  // 본문 줄 수를 추정해 추가 분할한다. 추정은 보수적인 근사값이며 — 정확한
+  // 페이지 분할은 브라우저 레이아웃에 의존하지만, 이 사전 분할만으로도 1410개
+  // 단락이 1개 페이지에 쌓이는 비정상 상황은 막을 수 있다.
+  //
+  // 주의: 합성된 페이지 경계는 round-trip 시 pageBreak 마커로 저장되면 안 된다.
+  // fromPM 은 page 경계가 아니라 paragraph.attrs.pageBreak 만 신뢰해야 한다.
   const pp = section.pagePr;
   const pageAttrs = (index: number): Record<string, unknown> => {
     const out: Record<string, unknown> = { pageIndex: index };
@@ -258,19 +262,52 @@ function sectionToNode(section: HwpxSection, doc: HwpxDocument, ctx: ConvertCont
   };
 
   const bodyParas = section.body.length > 0 ? section.body : [];
-  const pageBuckets: HwpxParagraph[][] = [[]];
+  const explicitBuckets: HwpxParagraph[][] = [[]];
   for (let i = 0; i < bodyParas.length; i += 1) {
     const p = bodyParas[i]!;
     // 첫 paragraph 의 pageBreak 는 "섹션 시작도 곧 페이지 시작" 이라는 의미로 무시.
     if (p.pageBreak && i > 0) {
-      pageBuckets.push([p]);
+      explicitBuckets.push([p]);
     } else {
-      pageBuckets[pageBuckets.length - 1]!.push(p);
+      explicitBuckets[explicitBuckets.length - 1]!.push(p);
     }
   }
-  if (pageBuckets.length === 1 && pageBuckets[0]!.length === 0) {
-    pageBuckets[0] = [];
+
+  // 본문 영역 (pt). 미정 시 A4 기준 fallback.
+  const A4_WIDTH_HWP = 59528;
+  const A4_HEIGHT_HWP = 84189;
+  const widthHwp = pp?.landscape ? (pp.height ?? A4_HEIGHT_HWP) : (pp?.width ?? A4_WIDTH_HWP);
+  const heightHwp = pp?.landscape ? (pp.width ?? A4_WIDTH_HWP) : (pp?.height ?? A4_HEIGHT_HWP);
+  const contentWidthPt = Math.max(
+    100,
+    (widthHwp - (pp?.marginLeft ?? 0) - (pp?.marginRight ?? 0)) / 100,
+  );
+  const contentHeightPt = Math.max(
+    150,
+    (heightHwp - (pp?.marginTop ?? 0) - (pp?.marginBottom ?? 0)) / 100,
+  );
+
+  const pageBuckets: HwpxParagraph[][] = [];
+  for (const bucket of explicitBuckets) {
+    if (bucket.length === 0) {
+      pageBuckets.push(bucket);
+      continue;
+    }
+    let curr: HwpxParagraph[] = [];
+    let currHeight = 0;
+    for (const para of bucket) {
+      const ph = estimateParaHeightPt(para, ctx, contentWidthPt);
+      if (curr.length > 0 && currHeight + ph > contentHeightPt) {
+        pageBuckets.push(curr);
+        curr = [];
+        currHeight = 0;
+      }
+      curr.push(para);
+      currHeight += ph;
+    }
+    pageBuckets.push(curr);
   }
+  if (pageBuckets.length === 0) pageBuckets.push([]);
 
   const pageNodes: PMNode[] = pageBuckets.map((bucket, pi) => {
     const paragraphs =
@@ -279,6 +316,108 @@ function sectionToNode(section: HwpxSection, doc: HwpxDocument, ctx: ConvertCont
   });
 
   return hwpxSchema.node('section', { sectionId: section.id || '0' }, pageNodes);
+}
+
+/**
+ * 단락 한 개의 렌더 높이 (pt) 를 보수적으로 추정한다. 정확하지 않아도 되지만,
+ * 실제 높이를 ±50% 안쪽으로 잡아야 페이지 분할이 자연스럽다.
+ *
+ * 추정 요소:
+ *  - 텍스트 길이 / (본문 너비 / 한 글자 너비) → 줄 수
+ *  - 폰트 높이 (CharPr.height, 1pt=100) × 줄 간격 배수
+ *  - 인라인 표/그림 높이는 직접 더한다
+ *  - paragraph 위/아래 margin
+ */
+function estimateParaHeightPt(
+  p: HwpxParagraph,
+  ctx: ConvertContext,
+  contentWidthPt: number,
+): number {
+  const pp = ctx.paraProps.get(p.paraPrIDRef);
+  // 첫 run 의 폰트 높이를 단락 대표 height 로 본다.
+  let fontHeightPt = 10;
+  const firstRun = p.runs[0];
+  if (firstRun) {
+    const cp = ctx.charProps.get(firstRun.charPrIDRef);
+    if (cp && typeof cp.height === 'number' && cp.height > 0) fontHeightPt = cp.height / 100;
+  }
+  let lineMultiplier = 1.0;
+  if (pp?.lineSpacingValue !== undefined && pp.lineSpacingValue !== null) {
+    if (pp.lineSpacingType === 'PERCENT' || pp.lineSpacingType === undefined) {
+      lineMultiplier = pp.lineSpacingValue / 100;
+    } else {
+      // FIXED/AT_LEAST: 값이 곧 줄 높이 (pt) 이므로 fontHeightPt 와 비교해 큰 쪽
+      const lhPt = pp.lineSpacingValue / 100;
+      lineMultiplier = Math.max(1.0, lhPt / fontHeightPt);
+    }
+  } else {
+    lineMultiplier = 1.6; // HWP 기본 줄 간격 근사 (160%)
+  }
+  const lineHeightPt = fontHeightPt * lineMultiplier;
+
+  let charCount = 0;
+  let extraPt = 0;
+  let forcedNewLines = 0;
+  for (const r of p.runs) {
+    for (const inl of r.inlines) {
+      switch (inl.kind) {
+        case 'text':
+          charCount += inl.value.length;
+          break;
+        case 'tab':
+          charCount += 4;
+          break;
+        case 'lineBreak':
+          forcedNewLines += 1;
+          break;
+        case 'pageBreak':
+          forcedNewLines += 1;
+          break;
+        case 'hyperlink':
+          // 링크 안의 텍스트는 평문으로 근사
+          for (const sub of inl.inlines) {
+            if (sub.kind === 'text') charCount += sub.value.length;
+          }
+          break;
+        case 'picture': {
+          const hPt = (inl.height ?? 0) / 100;
+          extraPt += Math.max(0, hPt);
+          break;
+        }
+        case 'table': {
+          const t = inl.table;
+          if (typeof t.height === 'number' && t.height > 0) {
+            extraPt += t.height / 100;
+          } else {
+            // 행당 ~36pt 근사 (실제 행 평균 높이는 셀 내용에 따라 24~80pt 범위).
+            // 작은 표는 페이지에 채우고 큰 표는 자체 페이지로 격리되도록 보수 추정.
+            const rowCount = t.rowCnt || t.rows.length || 1;
+            extraPt += rowCount * 36;
+          }
+          break;
+        }
+        case 'shapeGroup': {
+          const hPt = (inl.height ?? 0) / 100;
+          extraPt += Math.max(20, hPt);
+          break;
+        }
+        case 'footnote':
+        case 'endnote':
+        case 'comment':
+          // 본문에는 작은 마커만 차지
+          charCount += 2;
+          break;
+        default:
+          charCount += 1;
+      }
+    }
+  }
+  // 한글/한자 폭 가정: 폰트 높이의 ~1.0배. 영문 혼용 보정 위해 0.85.
+  const glyphWidthPt = Math.max(3, fontHeightPt * 0.85);
+  const charsPerLine = Math.max(8, Math.floor(contentWidthPt / glyphWidthPt));
+  const textLines = Math.max(1, Math.ceil(charCount / charsPerLine)) + forcedNewLines;
+  const marginPt = ((pp?.marginPrev ?? 0) + (pp?.marginNext ?? 0)) / 100;
+  return textLines * lineHeightPt + extraPt + marginPt;
 }
 
 function paragraphToNode(p: HwpxParagraph, doc: HwpxDocument, ctx: ConvertContext): PMNode {
