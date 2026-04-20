@@ -332,8 +332,25 @@ interface PreviewRun {
   inlines?: PreviewInline[];
   style?: PreviewRunStyle;
 }
+
+/**
+ * toPM 의 `enrichCell` 이 paragraph 단위로 주입하는 CSS 장식 필드.
+ * renderCell 은 paraStyle 이 있으면 단락을 <p> 로 감싼다.
+ */
+interface PreviewParaStyle {
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  lineHeight?: string;
+  /** HWPUNIT = 1/100 pt. */
+  textIndent?: number;
+  paddingLeft?: number;
+  paddingRight?: number;
+  marginTop?: number;
+  marginBottom?: number;
+}
+
 interface PreviewPara {
   runs?: PreviewRun[];
+  paraStyle?: PreviewParaStyle;
 }
 interface PreviewBorderSide {
   type?: string;
@@ -361,6 +378,8 @@ interface PreviewCell {
   colSpan?: number;
   rowSpan?: number;
   header?: boolean;
+  /** 셀 내용 세로 정렬 — `<hp:subList vertAlign="…">` 에서 옴. 기본 TOP. */
+  vertAlign?: 'TOP' | 'CENTER' | 'BOTTOM';
   /** toPM 에서 borderFillIDRef 를 해석해 주입한 실제 경계/채움 정의. */
   border?: PreviewBorderDecor;
 }
@@ -525,73 +544,70 @@ function runStyleToAttrs(style: PreviewRunStyle | undefined): Record<string, str
 
 function renderCell(cell: PreviewCell): DOMOutputSpec {
   const kids: DOMOutputSpec[] = [];
-  let textBuffer = '';
-  let currentStyleAttrs: Record<string, string> = {};
-  const flushText = () => {
-    if (textBuffer.length > 0) {
-      kids.push(['span', { ...currentStyleAttrs }, textBuffer] as DOMOutputSpec);
-      textBuffer = '';
-    }
-  };
-  const walkInline = (inl: PreviewInline) => {
-    if (inl.kind === 'text') {
-      textBuffer += inl.value ?? '';
-      return;
-    }
-    if (inl.kind === 'picture' && inl.src) {
-      flushText();
-      // HWPX hp:pic@width/height 는 HWPUNIT (1/100 pt).
-      // HTML img 의 width/height attribute 는 CSS px 이므로 pt 값을 그대로 넣으면 축소됨.
-      // CSS style 로 pt 단위 지정 → 브라우저가 72 DPI 기준으로 정확한 크기 환산.
-      // max-width:100% 로 셀 폭 초과 방지, height:auto 로 비율 유지는 CSS 쪽에서 처리.
-      const w = hwpxUnitToPt(typeof inl.width === 'number' ? inl.width : 0);
-      const h = hwpxUnitToPt(typeof inl.height === 'number' ? inl.height : 0);
-      const attrs: Record<string, string> = {
-        src: String(inl.src),
-        class: 'hwpx-table-cell-img',
-        loading: 'lazy',
-      };
-      const styleParts: string[] = [];
-      if (w > 0) styleParts.push(`width:${w}pt`);
-      if (h > 0) styleParts.push(`height:${h}pt`);
-      styleParts.push('max-width:100%');
-      attrs['style'] = styleParts.join(';');
-      if (typeof inl.binaryRef === 'string') attrs['data-binary-ref'] = inl.binaryRef;
-      kids.push(['img', attrs] as DOMOutputSpec);
-      return;
-    }
-    if (inl.kind === 'table' && inl.table) {
-      // 중첩 표는 재귀적으로 확장. 내부 표의 width 도 넘겨줌.
-      flushText();
-      kids.push(renderTableSpec(JSON.stringify(inl.table), inl.table.width));
-      return;
-    }
-    if (inl.kind === 'shapeGroup') {
-      // 표 안에 들어 있는 hp:container@PICTURE (콜아웃/화살표 등).
-      // shapeGroupSpec.toDOM 과 유사하게 라벨 박스로 표시.
-      flushText();
-      const labels = String(inl.labels ?? '').trim();
-      const styleParts: string[] = [];
-      if (typeof inl.width === 'number' && inl.width > 0) {
-        styleParts.push(`min-width:${Math.min(320, hwpxUnitToPt(inl.width))}pt`);
-      }
-      if (typeof inl.height === 'number' && inl.height > 0) {
-        styleParts.push(`min-height:${Math.min(200, hwpxUnitToPt(inl.height))}pt`);
-      }
-      const shapeAttrs: Record<string, string> = {
-        class: 'hwpx-shape-group',
-        title: `도형 그룹 (${labels || '라벨 없음'})`,
-        'data-kind': 'shape-group',
-      };
-      if (styleParts.length > 0) shapeAttrs['style'] = styleParts.join(';');
-      kids.push(['span', shapeAttrs, labels || '◌ 도형'] as DOMOutputSpec);
-      return;
-    }
-    // tab/lineBreak/bookmark 등은 무시 (MVP).
-  };
+  // 각 paragraph 별로 별도 <p> 를 만들어 정렬·줄간격을 따로 적용한다.
+  // 이전엔 모든 inline 을 셀 자식으로 평탄화해 td 에 직접 붙였는데,
+  // 그러면 paragraph 가 가진 align/lineHeight 가 사라져 표 안 본문이 항상
+  // 좌측 정렬로 보이는 버그가 있었다.
   for (const para of cell.body ?? []) {
+    const paraKids: DOMOutputSpec[] = [];
+    let textBuffer = '';
+    let currentStyleAttrs: Record<string, string> = {};
+    const flushText = () => {
+      if (textBuffer.length > 0) {
+        paraKids.push(['span', { ...currentStyleAttrs }, textBuffer] as DOMOutputSpec);
+        textBuffer = '';
+      }
+    };
+    const walkInline = (inl: PreviewInline) => {
+      if (inl.kind === 'text') {
+        textBuffer += inl.value ?? '';
+        return;
+      }
+      if (inl.kind === 'picture' && inl.src) {
+        flushText();
+        const w = hwpxUnitToPt(typeof inl.width === 'number' ? inl.width : 0);
+        const h = hwpxUnitToPt(typeof inl.height === 'number' ? inl.height : 0);
+        const attrs: Record<string, string> = {
+          src: String(inl.src),
+          class: 'hwpx-table-cell-img',
+          loading: 'lazy',
+        };
+        const styleParts: string[] = [];
+        if (w > 0) styleParts.push(`width:${w}pt`);
+        if (h > 0) styleParts.push(`height:${h}pt`);
+        styleParts.push('max-width:100%');
+        attrs['style'] = styleParts.join(';');
+        if (typeof inl.binaryRef === 'string') attrs['data-binary-ref'] = inl.binaryRef;
+        paraKids.push(['img', attrs] as DOMOutputSpec);
+        return;
+      }
+      if (inl.kind === 'table' && inl.table) {
+        flushText();
+        paraKids.push(renderTableSpec(JSON.stringify(inl.table), inl.table.width));
+        return;
+      }
+      if (inl.kind === 'shapeGroup') {
+        flushText();
+        const labels = String(inl.labels ?? '').trim();
+        const styleParts: string[] = [];
+        if (typeof inl.width === 'number' && inl.width > 0) {
+          styleParts.push(`min-width:${Math.min(320, hwpxUnitToPt(inl.width))}pt`);
+        }
+        if (typeof inl.height === 'number' && inl.height > 0) {
+          styleParts.push(`min-height:${Math.min(200, hwpxUnitToPt(inl.height))}pt`);
+        }
+        const shapeAttrs: Record<string, string> = {
+          class: 'hwpx-shape-group',
+          title: `도형 그룹 (${labels || '라벨 없음'})`,
+          'data-kind': 'shape-group',
+        };
+        if (styleParts.length > 0) shapeAttrs['style'] = styleParts.join(';');
+        paraKids.push(['span', shapeAttrs, labels || '◌ 도형'] as DOMOutputSpec);
+        return;
+      }
+      // tab/lineBreak/bookmark 등은 무시 (MVP).
+    };
     for (const run of para.runs ?? []) {
-      // run 별로 style 이 달라지면 직전 text 를 flush 후 current 갱신.
       const nextAttrs = runStyleToAttrs(run.style);
       const sameStyle = JSON.stringify(nextAttrs) === JSON.stringify(currentStyleAttrs);
       if (!sameStyle) {
@@ -600,13 +616,54 @@ function renderCell(cell: PreviewCell): DOMOutputSpec {
       }
       for (const inl of run.inlines ?? []) walkInline(inl);
     }
+    flushText();
+    const ps = para.paraStyle;
+    const paraStyleParts: string[] = [];
+    if (ps?.textAlign) paraStyleParts.push(`text-align:${ps.textAlign}`);
+    if (ps?.lineHeight) paraStyleParts.push(`line-height:${ps.lineHeight}`);
+    if (ps?.textIndent !== undefined && ps.textIndent !== 0) {
+      paraStyleParts.push(`text-indent:${hwpxUnitToPt(ps.textIndent)}pt`);
+    }
+    if (ps?.paddingLeft !== undefined && ps.paddingLeft > 0) {
+      paraStyleParts.push(`padding-left:${hwpxUnitToPt(ps.paddingLeft)}pt`);
+    }
+    if (ps?.paddingRight !== undefined && ps.paddingRight > 0) {
+      paraStyleParts.push(`padding-right:${hwpxUnitToPt(ps.paddingRight)}pt`);
+    }
+    if (ps?.marginTop !== undefined && ps.marginTop > 0) {
+      paraStyleParts.push(`margin-top:${hwpxUnitToPt(ps.marginTop)}pt`);
+    }
+    if (ps?.marginBottom !== undefined && ps.marginBottom > 0) {
+      paraStyleParts.push(`margin-bottom:${hwpxUnitToPt(ps.marginBottom)}pt`);
+    }
+    // 마진 0 기본값. paragraphs 사이 자동 띄어쓰기를 줄여 hwp 와 동일한 간격.
+    if (
+      ps?.marginTop === undefined ||
+      ps.marginTop === 0 ||
+      ps?.marginBottom === undefined ||
+      ps.marginBottom === 0
+    ) {
+      if (ps?.marginTop === undefined || ps.marginTop === 0) paraStyleParts.push('margin-top:0');
+      if (ps?.marginBottom === undefined || ps.marginBottom === 0)
+        paraStyleParts.push('margin-bottom:0');
+    }
+    const paraAttrs: Record<string, string> = {};
+    if (paraStyleParts.length > 0) paraAttrs['style'] = paraStyleParts.join(';');
+    if (paraKids.length === 0) {
+      kids.push(['p', paraAttrs, '\u00a0'] as DOMOutputSpec);
+    } else {
+      kids.push(['p', paraAttrs, ...paraKids] as DOMOutputSpec);
+    }
   }
-  flushText();
-  // 셀 폭/padding/rowspan/colspan 을 td 속성에 반영.
+  // 셀 폭/padding/rowspan/colspan/vertical-align 을 td 속성에 반영.
   const tdAttrs: Record<string, string> = {};
   const styleParts: string[] = [];
   if (cell.width && cell.width > 0) styleParts.push(`width:${hwpxUnitToPt(cell.width)}pt`);
   if (cell.height && cell.height > 0) styleParts.push(`height:${hwpxUnitToPt(cell.height)}pt`);
+  // <hp:subList vertAlign> → CSS vertical-align. CENTER 가 가장 흔함 (제목 셀 등).
+  if (cell.vertAlign === 'CENTER') styleParts.push('vertical-align:middle');
+  else if (cell.vertAlign === 'BOTTOM') styleParts.push('vertical-align:bottom');
+  else if (cell.vertAlign === 'TOP') styleParts.push('vertical-align:top');
   const ml = cell.marginLeft,
     mr = cell.marginRight,
     mt = cell.marginTop,
@@ -643,7 +700,9 @@ function renderCell(cell: PreviewCell): DOMOutputSpec {
   if (cell.colSpan && cell.colSpan > 1) tdAttrs['colspan'] = String(cell.colSpan);
   if (cell.rowSpan && cell.rowSpan > 1) tdAttrs['rowspan'] = String(cell.rowSpan);
   if (cell.header) tdAttrs['scope'] = 'col';
-  if (kids.length === 0) return ['td', tdAttrs, '\u00a0'] as DOMOutputSpec;
+  if (kids.length === 0) {
+    return ['td', tdAttrs, ['p', { style: 'margin:0' }, '\u00a0']] as DOMOutputSpec;
+  }
   return ['td', tdAttrs, ...kids] as DOMOutputSpec;
 }
 

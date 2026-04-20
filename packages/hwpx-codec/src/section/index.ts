@@ -477,10 +477,16 @@ function parseCell(node: OrderedNode): Cell {
   let marginBottom: number | undefined;
   let colAddr: number | undefined;
   let rowAddr: number | undefined;
+  let vertAlign: 'TOP' | 'CENTER' | 'BOTTOM' | undefined;
 
   for (const child of children(node)) {
     const n = tagName(child);
     if (n === 'hp:subList' || n === 'subList') {
+      const sa = attrs(child);
+      const va = (sa['vertAlign'] ?? '').toUpperCase();
+      if (va === 'TOP' || va === 'CENTER' || va === 'BOTTOM') {
+        vertAlign = va;
+      }
       for (const sub of children(child)) {
         const sn = tagName(sub);
         if (sn === 'hp:p' || sn === 'p') body.push(parseParagraph(sub));
@@ -523,6 +529,7 @@ function parseCell(node: OrderedNode): Cell {
   if (marginBottom !== undefined) out.marginBottom = marginBottom;
   if (colAddr !== undefined) out.colAddr = colAddr;
   if (rowAddr !== undefined) out.rowAddr = rowAddr;
+  if (vertAlign !== undefined) out.vertAlign = vertAlign;
   return out;
 }
 
@@ -694,7 +701,9 @@ function serializeRow(r: Row): OrderedNode {
 }
 
 function serializeCell(c: Cell): OrderedNode {
-  const subList = elem('hp:subList', {}, c.body.map(serializeParagraph));
+  const subListAttrs: Record<string, string | undefined> = {};
+  if (c.vertAlign) subListAttrs['vertAlign'] = c.vertAlign;
+  const subList = elem('hp:subList', subListAttrs, c.body.map(serializeParagraph));
   const kids: OrderedNode[] = [subList];
   if (c.colAddr !== undefined || c.rowAddr !== undefined) {
     kids.push(

@@ -6,6 +6,7 @@ import type {
   HwpxDocument,
   Inline,
   Paragraph as HwpxParagraph,
+  ParaPr,
   Run,
   Section as HwpxSection,
   Table as HwpxTable,
@@ -59,6 +60,7 @@ export function toProseMirror(doc: HwpxDocument, opts: ToProseMirrorOptions = {}
     resolveBinarySrc: opts.resolveBinarySrc,
     borderFillMap,
     charProps: doc.header.charProps,
+    paraProps: doc.header.paraProps,
     fontFaces: doc.header.fontFaces,
   };
   const sections =
@@ -73,7 +75,23 @@ interface ConvertContext {
   borderFillMap: ReadonlyMap<string, BorderFill>;
   /** 표 cellsJson preview 에서 run 별 charPr 스타일을 미리 해석해 주입할 때 사용. */
   charProps: ReadonlyMap<string, CharPr>;
+  /** 표 cellsJson preview 에서 paragraph 별 paraPr (align/lineSpacing) 해석에 사용. */
+  paraProps: ReadonlyMap<string, ParaPr>;
   fontFaces: readonly FontFace[];
+}
+
+/**
+ * 표 preview 에서 paragraph 에 미리 계산해 주입하는 CSS 장식 필드.
+ * schema 의 renderCell 이 <p style="…"> 로 감싸 텍스트 정렬과 줄간격을 구현한다.
+ */
+interface PreviewParaStyle {
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  lineHeight?: string;
+  textIndent?: number;
+  paddingLeft?: number;
+  paddingRight?: number;
+  marginTop?: number;
+  marginBottom?: number;
 }
 
 /**
@@ -118,6 +136,55 @@ function resolveRunStyle(charPrIDRef: string, ctx: ConvertContext): PreviewRunSt
       }
       n++;
     }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * paraPrIDRef → PreviewParaStyle. 표 셀 안 단락에 적용할 정렬/줄간격/들여쓰기.
+ * paraPr 가 없거나 의미있는 값이 없으면 undefined.
+ */
+function resolveParaStyle(paraPrIDRef: string, ctx: ConvertContext): PreviewParaStyle | undefined {
+  const pp = ctx.paraProps.get(paraPrIDRef);
+  if (!pp) return undefined;
+  const out: PreviewParaStyle = {};
+  switch (pp.align) {
+    case 'center':
+      out.textAlign = 'center';
+      break;
+    case 'right':
+      out.textAlign = 'right';
+      break;
+    case 'justify':
+    case 'distribute':
+      out.textAlign = 'justify';
+      break;
+    case 'left':
+      out.textAlign = 'left';
+      break;
+  }
+  if (pp.lineSpacingValue !== undefined && pp.lineSpacingValue !== null) {
+    if (pp.lineSpacingType === 'PERCENT' || pp.lineSpacingType === undefined) {
+      out.lineHeight = String(pp.lineSpacingValue / 100);
+    } else {
+      // FIXED/AT_LEAST: HWPUNIT → pt
+      out.lineHeight = `${pp.lineSpacingValue / 100}pt`;
+    }
+  }
+  if (pp.indentFirstLine !== undefined && pp.indentFirstLine !== null) {
+    out.textIndent = pp.indentFirstLine;
+  }
+  if (pp.indentLeft !== undefined && pp.indentLeft !== null) {
+    out.paddingLeft = pp.indentLeft;
+  }
+  if (pp.indentRight !== undefined && pp.indentRight !== null) {
+    out.paddingRight = pp.indentRight;
+  }
+  if (pp.marginPrev !== undefined && pp.marginPrev !== null) {
+    out.marginTop = pp.marginPrev;
+  }
+  if (pp.marginNext !== undefined && pp.marginNext !== null) {
+    out.marginBottom = pp.marginNext;
   }
   return Object.keys(out).length ? out : undefined;
 }
@@ -397,19 +464,24 @@ function enrichCell(cell: HwpxCell, ctx: ConvertContext): HwpxCell {
   const decor = resolveBorderDecor(cell.borderFillIDRef, ctx.borderFillMap);
   const enriched: HwpxCell & { border?: PreviewBorderDecor } = {
     ...cell,
-    body: cell.body.map((p) => ({
-      ...p,
-      runs: p.runs.map((r) => {
-        const style = resolveRunStyle(r.charPrIDRef, ctx);
-        // style 필드는 HwpxRun 원본에 없는 장식 필드. cellsJson 에만 실림.
-        const enrichedRun = {
-          ...r,
-          inlines: r.inlines.map((inl) => enrichInline(inl, ctx)),
-        } as typeof r & { style?: PreviewRunStyle };
-        if (style) enrichedRun.style = style;
-        return enrichedRun;
-      }),
-    })),
+    body: cell.body.map((p) => {
+      const paraStyle = resolveParaStyle(p.paraPrIDRef, ctx);
+      const enrichedPara = {
+        ...p,
+        runs: p.runs.map((r) => {
+          const style = resolveRunStyle(r.charPrIDRef, ctx);
+          // style 필드는 HwpxRun 원본에 없는 장식 필드. cellsJson 에만 실림.
+          const enrichedRun = {
+            ...r,
+            inlines: r.inlines.map((inl) => enrichInline(inl, ctx)),
+          } as typeof r & { style?: PreviewRunStyle };
+          if (style) enrichedRun.style = style;
+          return enrichedRun;
+        }),
+      } as typeof p & { paraStyle?: PreviewParaStyle };
+      if (paraStyle) enrichedPara.paraStyle = paraStyle;
+      return enrichedPara;
+    }),
   };
   if (decor) enriched.border = decor;
   return enriched;

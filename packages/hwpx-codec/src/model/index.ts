@@ -315,6 +315,11 @@ export interface Cell {
   rowAddr?: number;
   /** 셀별 테두리 ID — 셀마다 다른 테두리 스타일을 가질 수 있음. */
   borderFillIDRef?: string;
+  /**
+   * 셀 내용의 세로 정렬 — `<hp:subList vertAlign="…">` 에서 옴.
+   * 기본은 TOP. CENTER/BOTTOM 일 때만 명시적 표시.
+   */
+  vertAlign?: 'TOP' | 'CENTER' | 'BOTTOM';
 }
 
 /**
